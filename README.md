@@ -85,6 +85,63 @@ if __name__ == '__main__':
     print(inorder(root))
 ```
 
-If you want graphical diagrams, add PNG/SVG files to the repo and reference them here.
+### Visual Reference
 
-*Updated on branch copilot-readme by Copilot CLI on $ts*
+![Binary tree](images/binary_tree.png)
+
+## Binary Tree UI (Win32 GUI)
+
+A native Windows desktop application has been added under src\binary_tree_ui/ that provides a small GUI for building and visualizing a Binary Search Tree (BST).
+
+Features
+
+- Enter a comma-separated list of integers and build a BST using insertion order.
+- Visualize the tree using GDI+ (nodes drawn as circles, edges as lines).
+- "Build Tree" computes node positions and redraws the visualization.
+- "Export PNG" saves the current visualization as binary_tree_export.png in the working directory where the EXE is run (typically build\Release).
+
+Where to find the code
+
+- src\binary_tree_ui/CMakeLists.txt — CMake project and build config
+- src\binary_tree_ui/include/Tree.h — Tree node and BinaryTree class
+- src\binary_tree_ui/src/Tree.cpp — insertion, cleanup, and position assignment
+- src\binary_tree_ui/src/main.cpp — Win32 application and GDI+ rendering logic
+
+For more details on the UI implementation, see [Binary Tree UI README](src/binary_tree_ui/README.md).
+
+Prerequisites
+
+- Windows with Visual Studio (Desktop C++ workload) or MSVC Build Tools installed
+- CMake (>= 3.8). Install via winget: `winget install --id Kitware.CMake`
+
+Build (PowerShell)
+
+Set-Location 'C:\Users\bartz\source\repos\CliTest\src\binary_tree_ui'
+mkdir build
+Set-Location build
+cmake .. -G "Visual Studio 17 2022" -A x64
+cmake --build . --config Release
+
+Run
+
+- Run the produced BinaryTreeUI.exe (e.g., build\Release\BinaryTreeUI.exe).
+- Enter comma-separated integers (e.g., `1,2,3,4,5,6`) in the input box.
+- Click "Build Tree" to construct and display the BST.
+- Click "Export PNG" to save the visualization (binary_tree_export.png).
+
+Behavior details
+
+- Duplicate values are allowed and will be inserted to the right (code uses `if (v < node->val) left else right`).
+- Node layout uses in-order traversal to assign X positions and depth for Y positions, which works well for small-to-medium trees.
+- Export is implemented by rendering the scene to an off-screen GDI+ bitmap and saving it as PNG.
+
+Troubleshooting
+
+- If CMake is not available, open the src\binary_tree_ui folder in Visual Studio and build the generated project.
+- If the EXE does not render correctly, ensure GDI+ is available (standard on modern Windows) and try running the Release build directly.
+
+Contributing
+
+Improvements and fixes welcome. Create a branch and open a pull request. The feature branch for development is `feature/binary-tree-ui`.
+
+**Binary Tree UI added by Copilot CLI on May 23, 2026 15:46:40**
