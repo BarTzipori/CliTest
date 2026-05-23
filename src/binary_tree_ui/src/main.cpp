@@ -1,5 +1,6 @@
 #include <windows.h>
 #include <gdiplus.h>
+#include <commdlg.h>
 #include <string>
 #include <sstream>
 #include <vector>
@@ -125,12 +126,26 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 MessageBox(hwnd, L"PNG encoder not found.", L"Export Error", MB_OK | MB_ICONERROR);
                 break;
             }
-            std::wstring file = L"binary_tree_export.png";
+            // Ask user where to save the PNG
+            wchar_t szFile[MAX_PATH] = L"binary_tree_export.png";
+            OPENFILENAMEW ofn = {};
+            ofn.lStructSize = sizeof(ofn);
+            ofn.hwndOwner = hwnd;
+            ofn.lpstrFilter = L"PNG Files\0*.png\0All Files\0*.*\0";
+            ofn.lpstrFile = szFile;
+            ofn.nMaxFile = MAX_PATH;
+            ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
+            ofn.lpstrDefExt = L"png";
+            if (!GetSaveFileNameW(&ofn)) {
+                // user cancelled
+                break;
+            }
+            std::wstring file = szFile;
             Status saveStatus = bmp.Save(file.c_str(), &pngClsid, NULL);
             if (saveStatus != Ok) {
                 MessageBox(hwnd, L"Failed to save PNG.", L"Export Error", MB_OK | MB_ICONERROR);
             } else {
-                MessageBox(hwnd, L"Exported to binary_tree_export.png", L"Export", MB_OK);
+                MessageBox(hwnd, L"Exported to selected file.", L"Export", MB_OK);
             }
         }
         break;
