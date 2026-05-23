@@ -3,6 +3,8 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include <cstdlib>
+#include <errno.h>
 #include "..\include\Tree.h"
 
 #pragma comment(lib, "gdiplus.lib")
@@ -20,12 +22,24 @@ void ParseInput(const std::wstring& s, std::vector<int>& out) {
     std::wstring token;
     std::wistringstream iss(s);
     while (std::getline(iss, token, L',')) {
-        size_t start = token.find_first_not_of(L" \t");
+        // trim whitespace (space, tab, CR, LF)
+        size_t start = token.find_first_not_of(L" \t\r\n");
         if (start == std::wstring::npos) continue;
-        size_t end = token.find_last_not_of(L" \t");
+        size_t end = token.find_last_not_of(L" \t\r\n");
         std::wstring t = token.substr(start, end - start + 1);
-        int v = _wtoi(t.c_str());
-        out.push_back(v);
+
+        wchar_t* endptr = nullptr;
+        errno = 0;
+        long val = wcstol(t.c_str(), &endptr, 10);
+        if (endptr == t.c_str()) {
+            // no conversion; skip token
+            continue;
+        }
+        if (errno == ERANGE) {
+            // out of range; skip token
+            continue;
+        }
+        out.push_back(static_cast<int>(val));
     }
 }
 
@@ -76,6 +90,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             RECT rc; GetClientRect(hwnd, &rc);
             int width = rc.right - rc.left;
             int height = rc.bottom - rc.top;
+            if (width <= 0 || height <= 0) {
+                MessageBox(hwnd, L"Cannot export: window has invalid size.", L"Export Error", MB_OK | MB_ICONERROR);
+                break;
+            }
             Bitmap bmp(width, height, PixelFormat32bppARGB);
             Graphics g(&bmp);
             g.Clear(Color::White);
@@ -87,20 +105,33 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             if (g_tree.getRoot()) DrawNodeRec(g, g_tree.getRoot(), font, pen, brushNode, brushText);
             UINT numEncoders = 0; UINT size = 0;
             GetImageEncodersSize(&numEncoders, &size);
-            if (size == 0) break;
+            if (numEncoders == 0 || size == 0) {
+                MessageBox(hwnd, L"No image encoders available.", L"Export Error", MB_OK | MB_ICONERROR);
+                break;
+            }
             std::vector<BYTE> bufEnc(size);
             ImageCodecInfo* pImageCodecInfo = reinterpret_cast<ImageCodecInfo*>(bufEnc.data());
             GetImageEncoders(numEncoders, size, pImageCodecInfo);
             CLSID pngClsid = {0};
+            bool foundPng = false;
             for (UINT j = 0; j < numEncoders; ++j) {
-                if (wcscmp(pImageCodecInfo[j].MimeType, L"image/png") == 0) {
+                if (pImageCodecInfo[j].MimeType && wcscmp(pImageCodecInfo[j].MimeType, L"image/png") == 0) {
                     pngClsid = pImageCodecInfo[j].Clsid;
+                    foundPng = true;
                     break;
                 }
             }
+            if (!foundPng) {
+                MessageBox(hwnd, L"PNG encoder not found.", L"Export Error", MB_OK | MB_ICONERROR);
+                break;
+            }
             std::wstring file = L"binary_tree_export.png";
-            bmp.Save(file.c_str(), &pngClsid, NULL);
-            MessageBox(hwnd, L"Exported to binary_tree_export.png", L"Export", MB_OK);
+            Status saveStatus = bmp.Save(file.c_str(), &pngClsid, NULL);
+            if (saveStatus != Ok) {
+                MessageBox(hwnd, L"Failed to save PNG.", L"Export Error", MB_OK | MB_ICONERROR);
+            } else {
+                MessageBox(hwnd, L"Exported to binary_tree_export.png", L"Export", MB_OK);
+            }
         }
         break;
     }
@@ -131,7 +162,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     GdiplusStartupInput gdiplusStartupInput;
-    GdiplusStartup(&g_gdiplusToken, &gdiplusStartupInput, NULL);
+    Status gdStat = GdiplusStartup(&g_gdiplusToken, &gdiplusStartupInput, NULL);
+    if (gdStat != Ok) {
+        MessageBox(NULL, L"Failed to initialize GDI+.", L"Error", MB_OK | MB_ICONERROR);
+        return 0;
+    }
 
     const wchar_t CLASS_NAME[] = L"BinaryTreeWindowClass";
     WNDCLASS wc = {};
@@ -139,10 +174,19 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     wc.hInstance = hInstance;
     wc.lpszClassName = CLASS_NAME;
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-    RegisterClass(&wc);
+
+    if (!RegisterClass(&wc)) {
+        GdiplusShutdown(g_gdiplusToken);
+        MessageBox(NULL, L"RegisterClass failed", L"Error", MB_OK | MB_ICONERROR);
+        return 0;
+    }
 
     HWND hwnd = CreateWindowEx(0, CLASS_NAME, L"Binary Tree UI", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 900, 700, NULL, NULL, hInstance, NULL);
-    if (!hwnd) return 0;
+    if (!hwnd) {
+        GdiplusShutdown(g_gdiplusToken);
+        MessageBox(NULL, L"CreateWindowEx failed", L"Error", MB_OK | MB_ICONERROR);
+        return 0;
+    }
     ShowWindow(hwnd, nCmdShow);
 
     MSG msg;
