@@ -19,7 +19,6 @@ public:
     TreeNode* getRoot() const { return root; }
 private:
     TreeNode* root;
-    TreeNode* insertRec(TreeNode* node, int v);
     void deleteRec(TreeNode* node);
     void assignPositionsRec(TreeNode* node, int depth, int& currentX, int hSpacing, int vSpacing);
 };

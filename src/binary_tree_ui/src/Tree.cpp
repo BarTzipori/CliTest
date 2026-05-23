@@ -1,5 +1,5 @@
 #include "..\include\Tree.h"
-#include <functional>
+#include <stack>
 
 BinaryTree::~BinaryTree() { clear(); }
 
@@ -7,20 +7,28 @@ void BinaryTree::clear() { deleteRec(root); root = nullptr; }
 
 void BinaryTree::deleteRec(TreeNode* node) {
     if (!node) return;
-    deleteRec(node->left);
-    deleteRec(node->right);
-    delete node;
-}
-
-TreeNode* BinaryTree::insertRec(TreeNode* node, int v) {
-    if (!node) return new TreeNode(v);
-    if (v < node->val) node->left = insertRec(node->left, v);
-    else node->right = insertRec(node->right, v);
-    return node;
+    std::stack<TreeNode*> st;
+    st.push(node);
+    while (!st.empty()) {
+        TreeNode* n = st.top(); st.pop();
+        if (n->left) st.push(n->left);
+        if (n->right) st.push(n->right);
+        delete n;
+    }
 }
 
 void BinaryTree::insert(int v) {
-    root = insertRec(root, v);
+    if (!root) { root = new TreeNode(v); return; }
+    TreeNode* cur = root;
+    while (true) {
+        if (v < cur->val) {
+            if (cur->left) cur = cur->left;
+            else { cur->left = new TreeNode(v); return; }
+        } else {
+            if (cur->right) cur = cur->right;
+            else { cur->right = new TreeNode(v); return; }
+        }
+    }
 }
 
 void BinaryTree::assignPositions() {
